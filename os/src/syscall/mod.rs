@@ -21,14 +21,39 @@ const SYSCALL_GET_TIME: usize = 169;
 /// trace syscall
 const SYSCALL_TRACE: usize = 410;
 
+#[repr(usize)]
+#[allow(missing_docs)]
+pub enum Syscall {
+    Write = 0,
+    Exit = 1,
+    Yield = 2,
+    GetTime = 3,
+    Trace = 4,
+}
+
+impl Syscall {
+    fn from_raw(id: usize) -> Syscall {
+        match id {
+            SYSCALL_WRITE => Self::Write,
+            SYSCALL_EXIT => Self::Exit,
+            SYSCALL_YIELD => Self::Yield,
+            SYSCALL_GET_TIME => Self::GetTime,
+            SYSCALL_TRACE => Self::Trace,
+            _ => panic!("Unsupported syscall!"),
+        }
+    }
+}
+
 mod fs;
 mod process;
 
+use crate::task::inc_syscall_counter;
 use fs::*;
 use process::*;
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    inc_syscall_counter(Syscall::from_raw(syscall_id) as usize);
     match syscall_id {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),

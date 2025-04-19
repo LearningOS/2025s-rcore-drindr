@@ -39,12 +39,15 @@ pub struct TaskManager {
     inner: UPSafeCell<TaskManagerInner>,
 }
 
+const SYSCALL_COUNTER: usize = 6;
 /// Inner of Task Manager
 pub struct TaskManagerInner {
     /// task list
     tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
+    /// counter for syscall
+    syscall_counter: [[isize; SYSCALL_COUNTER]; MAX_APP_NUM],
 }
 
 lazy_static! {
@@ -65,6 +68,7 @@ lazy_static! {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
                     current_task: 0,
+                    syscall_counter: [[0isize; SYSCALL_COUNTER]; MAX_APP_NUM]
                 })
             },
         }
@@ -135,6 +139,19 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    fn get_syscall_counter(&self, id: usize) -> isize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let counter = inner.syscall_counter[current][id];
+        counter
+    }
+
+    fn inc_syscall_counter(&self, id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.syscall_counter[current][id] += 1;
+    }
 }
 
 /// Run the first task in task list.
@@ -168,4 +185,14 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// Get the syscall counter of current task
+pub fn get_syscall_counter(id: usize) -> isize {
+    TASK_MANAGER.get_syscall_counter(id)
+}
+
+/// Increment the syscall counter of current task
+pub fn inc_syscall_counter(id: usize) {
+    TASK_MANAGER.inc_syscall_counter(id);
 }
