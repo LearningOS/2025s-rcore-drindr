@@ -153,6 +153,26 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// inc the syscall counter
+    pub fn inc_syscall_counter(&self, id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur]
+            .syscall_counter
+            .entry(id)
+            .and_modify(|v| *v += 1)
+            .or_insert(1);
+    }
+
+    /// get the syscall counter
+    pub fn get_syscall_counter(&self, id: usize) -> isize {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task]
+            .syscall_counter
+            .get(&id)
+            .map_or(0, |s| *s)
+    }
 }
 
 /// Run the first task in task list.
@@ -191,6 +211,16 @@ pub fn exit_current_and_run_next() {
 /// Get the current 'Running' task's token.
 pub fn current_user_token() -> usize {
     TASK_MANAGER.get_current_token()
+}
+
+/// increment the syscall counter
+pub fn inc_current_syscall_counter(id: usize) {
+    TASK_MANAGER.inc_syscall_counter(id);
+}
+
+/// get the current syscall counter
+pub fn current_syscall_counter(id: usize) -> isize {
+    TASK_MANAGER.get_syscall_counter(id)
 }
 
 /// Get the current 'Running' task's trap contexts.

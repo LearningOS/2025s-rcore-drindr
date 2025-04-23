@@ -27,7 +27,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 /// page table entry structure
 pub struct PageTableEntry {
@@ -140,6 +140,23 @@ impl PageTable {
         assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
+
+    /// for syscall mapping purpose, record the frame tracker
+    pub fn map_with_tracker(&mut self, vpn: VirtPageNum, frame: FrameTracker, flags: PTEFlags) {
+        let ppn = frame.ppn;
+        self.map(vpn, ppn, flags);
+        self.frames.push(frame);
+    }
+
+    /// for syscall unmapping purpose, recycle the frame tracker
+    pub fn unmap_with_tracker(&mut self, vpn: VirtPageNum) {
+        let pte = self.find_pte(vpn).unwrap();
+        assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
+        let ppn = pte.ppn();
+        *pte = PageTableEntry::empty();
+        self.frames.retain(|p| p.ppn != ppn);
+    }
+
     /// remove the map between virtual page number and physical page number
     #[allow(unused)]
     pub fn unmap(&mut self, vpn: VirtPageNum) {
