@@ -88,6 +88,36 @@ impl MemorySet {
         }
         self.areas.push(map_area);
     }
+    /// for mmap syscall. assume the parameter is available
+    pub fn mmap(&mut self, start: usize, page_len: usize, port: u8) -> Result<(), ()> {
+        let flags = PTEFlags::from_bits(port << 1).ok_or(())? | PTEFlags::U;
+        for p in 0..page_len {
+            let vpn = VirtAddr::from(start + p * PAGE_SIZE).floor();
+            let pte = self.translate(vpn);
+            if pte.is_some() && pte.unwrap().is_valid() {
+                // dealloc previous page
+                self.munmap(start, p - 1).unwrap();
+                return Err(());
+            }
+            let frame = frame_alloc().ok_or(())?;
+            self.page_table.map_with_tracker(vpn, frame, flags);
+        }
+        Ok(())
+    }
+
+    /// for munmap syscall
+    pub fn munmap(&mut self, start: usize, page_len: usize) -> Result<(), ()> {
+        for p in 0..page_len {
+            let vpn = VirtAddr::from(start + p * PAGE_SIZE).floor();
+            let pte = self.translate(vpn);
+            if pte.is_none() || !pte.unwrap().is_valid() {
+                return Err(());
+            }
+            self.page_table.unmap_with_tracker(vpn);
+        }
+        Ok(())
+    }
+
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {
         self.page_table.map(
@@ -282,6 +312,13 @@ impl MemorySet {
     /// Translate a virtual page number to a page table entry
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.page_table.translate(vpn)
+    }
+
+    /// Return the address of the VirtAddress in kernel space
+    pub fn virt_in_kernel(&self, virt: VirtAddr) -> usize {
+        let vpn = virt.floor();
+        let ppn = self.translate(vpn).unwrap().ppn();
+        usize::from(PhysAddr::from(ppn)) + virt.page_offset()
     }
 
     ///Remove all `MapArea`

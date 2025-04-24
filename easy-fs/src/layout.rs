@@ -234,7 +234,6 @@ impl DiskInode {
                 }
             });
     }
-
     /// Clear size to zero and return blocks that should be deallocated.
     /// We will clear the block contents to zero later.
     pub fn clear_size(&mut self, block_device: &Arc<dyn BlockDevice>) -> Vec<u32> {
@@ -390,6 +389,7 @@ impl DiskInode {
 }
 /// A directory entry
 #[repr(C)]
+#[derive(Debug)]
 pub struct DirEntry {
     name: [u8; NAME_LENGTH_LIMIT + 1],
     inode_id: u32,
