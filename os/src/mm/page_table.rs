@@ -125,6 +125,22 @@ impl PageTable {
         }
         result
     }
+
+    /// map with tracker for syscall mmap
+    pub fn map_with_tracker(&mut self, vpn: VirtPageNum, frame: FrameTracker, flags: PTEFlags) {
+        self.map(vpn, frame.ppn, flags);
+        self.frames.push(frame);
+    }
+
+    /// unmap with tracker for syscall munmap
+    pub fn unmap_with_tracker(&mut self, vpn: VirtPageNum) {
+        let pte = self.find_pte(vpn).unwrap();
+        let ppn = pte.ppn().clone();
+        assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
+        *pte = PageTableEntry::empty();
+        self.frames.retain(|f| f.ppn != ppn);
+    }
+
     /// set the map between virtual page number and physical page number
     #[allow(unused)]
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
