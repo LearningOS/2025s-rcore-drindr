@@ -32,6 +32,14 @@ jobs:
       image: duskmoon/dev-env:rcore-ci
     steps:
       - uses: actions/checkout@v4
+      - name: Remove Cargo proxy config
+        run: |
+          unset RUSTUP_DIST_SERVER
+          unset RUSTUP_UPDATE_ROOT
+          unset CARGO_HTTP_MULTIPLEXING
+          # 删除或重置全局配置
+          rm ${CARGO_HOME}/config.toml || true
+          rm -rf rm ${CARGO_HOME}/registry/* || true
       - name: Run tests
         run: |
           qemu-system-riscv64 --version
@@ -58,7 +66,7 @@ jobs:
       - uses: actions/checkout@v3
         continue-on-error: true
         with:
-          ref: 'gh-pages'
+          ref: "gh-pages"
       - name: Save Log File
         uses: yfblock/multi-rank-log@main
         with:
