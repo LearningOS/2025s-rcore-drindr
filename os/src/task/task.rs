@@ -41,6 +41,8 @@ pub struct TaskControlBlockInner {
     pub task_status: TaskStatus,
     /// It is set when active exit or execution error occurs
     pub exit_code: Option<i32>,
+    /// From dead semaphore
+    pub dead_semaphore: bool,
 }
 
 impl TaskControlBlockInner {
@@ -75,6 +77,7 @@ impl TaskControlBlock {
                     task_cx: TaskContext::goto_trap_return(kstack_top),
                     task_status: TaskStatus::Ready,
                     exit_code: None,
+                    dead_semaphore: false,
                 })
             },
         }

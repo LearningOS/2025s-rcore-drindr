@@ -1,5 +1,6 @@
 use crate::{
     mm::kernel_token,
+    sync::dead_semaphore_detect,
     task::{add_task, current_task, TaskControlBlock},
     trap::{trap_handler, TrapContext},
 };
@@ -80,16 +81,17 @@ pub fn sys_gettid() -> isize {
 /// thread has not exited yet, return -2
 /// otherwise, return thread's exit code
 pub fn sys_waittid(tid: usize) -> i32 {
+    let current_tid = current_task()
+        .unwrap()
+        .inner_exclusive_access()
+        .res
+        .as_ref()
+        .unwrap()
+        .tid;
     trace!(
         "kernel:pid[{}] tid[{}] sys_waittid",
         current_task().unwrap().process.upgrade().unwrap().getpid(),
-        current_task()
-            .unwrap()
-            .inner_exclusive_access()
-            .res
-            .as_ref()
-            .unwrap()
-            .tid
+        current_tid
     );
     let task = current_task().unwrap();
     let process = task.process.upgrade().unwrap();
@@ -99,6 +101,7 @@ pub fn sys_waittid(tid: usize) -> i32 {
     if task_inner.res.as_ref().unwrap().tid == tid {
         return -1;
     }
+    drop(task_inner);
     let mut exit_code: Option<i32> = None;
     let waited_task = process_inner.tasks[tid].as_ref();
     if let Some(waited_task) = waited_task {
@@ -112,8 +115,40 @@ pub fn sys_waittid(tid: usize) -> i32 {
     if let Some(exit_code) = exit_code {
         // dealloc the exited thread
         process_inner.tasks[tid] = None;
+        if process_inner.dead_detect {
+            // wait for the thread to exit
+            if let Some(pos) = process_inner.blocking_task.iter().position(|(id, sem)| {
+                if *id == current_tid && sem.is_none() {
+                    true
+                } else {
+                    false
+                }
+            }) {
+                process_inner.blocking_task.remove(pos);
+            }
+
+            drop(process_inner);
+        }
+
         exit_code
     } else {
+        if process_inner.dead_detect {
+            // wait for the thread to exit
+            let mut found = false;
+            for (id, sem) in process_inner.blocking_task.iter() {
+                if *id == current_tid && sem.is_none() {
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                debug!("wait block, curretn_tid: {}, tid: {}", current_tid, tid);
+                process_inner.blocking_task.push((current_tid, None));
+            }
+            drop(process_inner);
+
+            dead_semaphore_detect();
+        }
         // waited thread has not exited
         -2
     }

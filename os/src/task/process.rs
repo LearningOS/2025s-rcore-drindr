@@ -45,8 +45,20 @@ pub struct ProcessControlBlockInner {
     pub task_res_allocator: RecycleAllocator,
     /// mutex list
     pub mutex_list: Vec<Option<Arc<dyn Mutex>>>,
+    /// mutex allocated
+    /// index: tid, value: allocated mutex ids
+    pub mutex_allocated: Vec<Option<Vec<usize>>>,
+    /// mutex needed
+    /// index: tid, value: mutex id
+    pub mutex_needed: Vec<Option<usize>>,
+    /// deadlock detect enable
+    pub dead_detect: bool,
     /// semaphore list
     pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
+    /// blocking list
+    /// (tid, semaphore_id)
+    /// semaphore_id is None if the task blocked by waittid
+    pub blocking_task: Vec<(usize, Option<usize>)>,
     /// condvar list
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
 }
@@ -117,7 +129,11 @@ impl ProcessControlBlock {
                     tasks: Vec::new(),
                     task_res_allocator: RecycleAllocator::new(),
                     mutex_list: Vec::new(),
+                    mutex_allocated: Vec::new(),
+                    mutex_needed: Vec::new(),
+                    dead_detect: false,
                     semaphore_list: Vec::new(),
+                    blocking_task: Vec::new(),
                     condvar_list: Vec::new(),
                 })
             },
@@ -243,7 +259,11 @@ impl ProcessControlBlock {
                     tasks: Vec::new(),
                     task_res_allocator: RecycleAllocator::new(),
                     mutex_list: Vec::new(),
+                    mutex_needed: Vec::new(),
+                    mutex_allocated: Vec::new(),
+                    dead_detect: false,
                     semaphore_list: Vec::new(),
+                    blocking_task: Vec::new(),
                     condvar_list: Vec::new(),
                 })
             },
